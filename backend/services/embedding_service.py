@@ -35,3 +35,43 @@ FUNCTIONS EXPORTED:
 
 Used by: query_pipeline.py (Step 1), scripts/ingest_schema.py
 """
+
+import config
+
+_model = None
+
+
+def get_model():
+    global _model
+    if _model is None:
+        print("Loading BGE-M3 model... (30-60 seconds on first load)")
+        from FlagEmbedding import BGEM3FlagModel
+        _model = BGEM3FlagModel(config.EMBEDDING_MODEL, use_fp16=True)
+        print("BGE-M3 model loaded successfully.")
+    return _model
+
+
+def embed_text(text: str) -> list:
+    model = get_model()
+    result = model.encode(
+        [text],
+        batch_size=1,
+        max_length=512,
+        return_dense=True,
+        return_sparse=False,
+        return_colbert_vecs=False,
+    )
+    return result["dense_vecs"][0].tolist()
+
+
+def embed_texts(texts: list) -> list:
+    model = get_model()
+    result = model.encode(
+        texts,
+        batch_size=32,
+        max_length=512,
+        return_dense=True,
+        return_sparse=False,
+        return_colbert_vecs=False,
+    )
+    return [v.tolist() for v in result["dense_vecs"]]

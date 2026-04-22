@@ -36,3 +36,101 @@ FUNCTIONS EXPORTED:
 All prompts are imported from utils/prompt_templates.py.
 Used by: query_pipeline.py (Steps 0, 5, 8)
 """
+
+
+
+
+
+
+import config
+from utils.prompt_templates import (
+    CLASSIFIER_SYSTEM_PROMPT,
+    RELEVANCE_CHECK_PROMPT,
+    SYSTEM_PROMPT,
+    SQL_GENERATION_PROMPT,
+    RESPONSE_SUMMARY_PROMPT,
+)
+
+_client = None
+
+
+def get_client():
+    global _client
+    if _client is None:
+        from groq import Groq
+        _client = Groq(api_key=config.GROQ_API_KEY)
+        print("Groq client initialized.")
+    return _client
+
+
+def classify_query(nl_query: str) -> str:
+    client = get_client()
+    resp = client.chat.completions.create(
+        model=config.GROQ_MODEL,
+        messages=[
+            {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
+            {"role": "user", "content": RELEVANCE_CHECK_PROMPT.format(nl_query=nl_query)},
+        ],
+        temperature=0.0,
+        max_tokens=5,
+    )
+    result = resp.choices[0].message.content.strip().upper()
+    for token in ("ALLOWED", "BLOCKED_DESTRUCTIVE", "BLOCKED_IRRELEVANT"):
+        if token in result:
+            return token
+    return "BLOCKED_IRRELEVANT"
+
+
+def generate_sql(nl_query: str, schema_context: str, memory_context: str) -> dict:
+    client = get_client()
+    try:
+        resp = client.chat.completions.create(
+            model=config.GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": SQL_GENERATION_PROMPT.format(
+                    schema_context=schema_context,
+                    memory_context=memory_context,
+                    nl_query=nl_query,
+                )},
+            ],
+            temperature=0.1,
+            max_tokens=1000,
+        )
+        sql = resp.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if sql.startswith("```"):
+            lines = sql.split("\n")
+            lines = [ln for ln in lines if not ln.strip().startswith("```")]
+            sql = "\n".join(lines).strip()
+        return {"status": "success", "sql": sql}
+    except Exception as e:
+        return {"status": "error", "message": f"SQL generation failed: {str(e)}"}
+
+
+def generate_summary_stream(nl_query: str, sql: str, columns: list, rows: list):
+    client = get_client()
+    preview = rows[:10]
+    csv_note = (
+        f"\nNote: Full result has {len(rows)} rows. Complete data saved to CSV."
+        if len(rows) > 10 else ""
+    )
+    stream = client.chat.completions.create(
+        model=config.GROQ_MODEL,
+        messages=[{"role": "user", "content": RESPONSE_SUMMARY_PROMPT.format(
+            nl_query=nl_query,
+            sql=sql,
+            preview_count=len(preview),
+            total_count=len(rows),
+            columns=columns,
+            rows_preview=preview,
+            csv_note=csv_note,
+        )}],
+        temperature=0.3,
+        max_tokens=600,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta

@@ -37,3 +37,85 @@ RUN WITH:
 After running, verify the JSON output looks correct, then run ingest_schema.py.
 Imports: pyodbc, config, json
 """
+
+import sys, os, json
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
+from services.database_service import get_connection
+
+
+def extract():
+    print("Connecting to SQL Server...")
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    print("Reading columns...")
+    cursor.execute("""
+        SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+        FROM INFORMATION_SCHEMA.COLUMNS
+        ORDER BY TABLE_NAME, ORDINAL_POSITION
+    """)
+    cols_raw = cursor.fetchall()
+
+    print("Reading primary keys...")
+    cursor.execute("""
+        SELECT KCU.TABLE_NAME, KCU.COLUMN_NAME
+        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS TC
+        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+          ON TC.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME
+        WHERE TC.CONSTRAINT_TYPE = 'PRIMARY KEY'
+    """)
+    pks = {(r[0], r[1]) for r in cursor.fetchall()}
+
+    print("Reading foreign keys...")
+    cursor.execute("""
+        SELECT
+            KCU.TABLE_NAME,
+            KCU.COLUMN_NAME,
+            RCU.TABLE_NAME  AS REF_TABLE,
+            RCU.COLUMN_NAME AS REF_COL
+        FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS RC
+        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+          ON RC.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME
+        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE RCU
+          ON RC.UNIQUE_CONSTRAINT_NAME = RCU.CONSTRAINT_NAME
+    """)
+    fks = {}
+    for row in cursor.fetchall():
+        fks.setdefault(row[0], []).append((row[1], row[2], row[3]))
+
+    conn.close()
+
+    # Group by table
+    tables = {}
+    for table, col, dtype, nullable in cols_raw:
+        tables.setdefault(table, []).append((col, dtype, nullable))
+
+    results = []
+    for table, columns in tables.items():
+        lines = [
+            f"Table: {table}",
+            f"Description: Stores records for {table}",
+            "Columns:",
+        ]
+        for col, dtype, nullable in columns:
+            pk_flag  = " [PRIMARY KEY]" if (table, col) in pks else ""
+            null_tag = " (nullable)"    if nullable == "YES" else ""
+            lines.append(f"- {col}: {dtype}{pk_flag}{null_tag}")
+
+        if table in fks:
+            lines.append("Relationships:")
+            for col, ref_table, ref_col in fks[table]:
+                lines.append(f"- {col} → {ref_table}.{ref_col}")
+
+        results.append({"id": table, "text": "\n".join(lines)})
+
+    os.makedirs(os.path.dirname(config.SCHEMA_METADATA_PATH), exist_ok=True)
+    with open(config.SCHEMA_METADATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"✅ Extracted {len(results)} tables → {config.SCHEMA_METADATA_PATH}")
+
+
+if __name__ == "__main__":
+    extract()

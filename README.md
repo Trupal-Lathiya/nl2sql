@@ -47,3 +47,6 @@ SECTIONS TO INCLUDE:
   8. PROJECT STRUCTURE
      Paste the folder tree from the specification with one-line descriptions.
 -->
+
+
+

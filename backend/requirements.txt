@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pinecone
+FlagEmbedding==1.2.11
+groq
+pyodbc
+pydantic
+python-multipart
+transformers==4.44.2
+peft
+sse-starlette

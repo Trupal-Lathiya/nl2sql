@@ -43,3 +43,53 @@ FUNCTIONS EXPORTED:
 
 Used by: query_pipeline.py (Steps 2, 3), scripts/ingest_schema.py
 """
+
+
+import config
+
+_index = None
+
+
+def get_index():
+    global _index
+    if _index is None:
+        from pinecone import Pinecone, ServerlessSpec
+        pc = Pinecone(api_key=config.PINECONE_API_KEY)
+        existing = [i.name for i in pc.list_indexes()]
+        if config.PINECONE_INDEX_NAME not in existing:
+            print(f"Creating Pinecone index '{config.PINECONE_INDEX_NAME}'...")
+            pc.create_index(
+                name=config.PINECONE_INDEX_NAME,
+                dimension=config.EMBEDDING_DIMENSION,
+                metric="cosine",
+                spec=ServerlessSpec(cloud=config.PINECONE_CLOUD, region=config.PINECONE_REGION),
+            )
+            print("Pinecone index created.")
+        _index = pc.Index(config.PINECONE_INDEX_NAME)
+        print(f"Connected to Pinecone index '{config.PINECONE_INDEX_NAME}'.")
+    return _index
+
+
+def upsert_schemas(records: list) -> dict:
+    index = get_index()
+    total = 0
+    for i in range(0, len(records), 100):
+        batch = records[i:i + 100]
+        index.upsert(vectors=batch)
+        total += len(batch)
+        print(f"  Upserted {total}/{len(records)} vectors...")
+    return {"upserted": total}
+
+
+def search_similar(query_embedding: list, top_k: int = 10) -> list:
+    index = get_index()
+    results = index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
+    return [{"id": m.id, "score": m.score, "metadata": m.metadata} for m in results.matches]
+
+
+def fetch_by_ids(ids: list) -> list:
+    if not ids:
+        return []
+    index = get_index()
+    result = index.fetch(ids=ids)
+    return [{"id": k, "metadata": v.metadata} for k, v in result.vectors.items()]

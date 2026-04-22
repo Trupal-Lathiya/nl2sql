@@ -38,3 +38,25 @@ WHAT IT EXPORTS:
 
 All other modules import these constants instead of calling os.getenv() directly.
 """
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_SERVER             = os.getenv("DB_SERVER", r"localhost\SQLEXPRESS")
+DB_NAME               = os.getenv("DB_NAME", "")
+DB_DRIVER             = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
+
+PINECONE_API_KEY      = os.getenv("PINECONE_API_KEY", "")
+PINECONE_INDEX_NAME   = os.getenv("PINECONE_INDEX_NAME", "nl2sql-schema")
+PINECONE_CLOUD        = os.getenv("PINECONE_CLOUD", "aws")
+PINECONE_REGION       = os.getenv("PINECONE_REGION", "us-east-1")
+
+EMBEDDING_MODEL       = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+EMBEDDING_DIMENSION   = int(os.getenv("EMBEDDING_DIMENSION", "1024"))
+
+GROQ_API_KEY          = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL            = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+
+SCHEMA_METADATA_PATH  = os.getenv("SCHEMA_METADATA_PATH", "data/schema_metadata.json")

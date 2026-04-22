@@ -31,3 +31,32 @@ MODELS DEFINED:
 These models are imported by query_routes.py (for type annotations) and by
 query_pipeline.py (to build the response dict that gets serialized).
 """
+
+
+from pydantic import BaseModel
+from typing import List, Any, Optional, Union, Literal
+
+
+class QueryRequest(BaseModel):
+    natural_language_query: str
+    session_id: str
+
+
+class QuerySuccessResponse(BaseModel):
+    status: Literal["success"]
+    nl_query: str
+    sql: str
+    retrieved_tables: List[str]
+    columns: List[str]
+    rows: List[List[Any]]
+    total_row_count: int
+    summary: str
+    csv_path: Optional[str] = None
+
+
+class QueryErrorResponse(BaseModel):
+    status: Literal["error"]
+    message: str
+
+
+QueryResponse = Union[QuerySuccessResponse, QueryErrorResponse]

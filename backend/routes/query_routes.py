@@ -36,3 +36,43 @@ THREE ENDPOINTS:
 Router prefix: /query
 This router is registered in app.py with app.include_router(router)
 """
+
+
+import json
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+
+from models.schemas import QueryRequest, QueryResponse
+from services.query_pipeline import run_pipeline, run_pipeline_stream
+from services.memory_service import clear_memory
+
+router = APIRouter(prefix="/query")
+
+
+@router.post("", response_model=QueryResponse)
+async def query_post(request: QueryRequest):
+    result = run_pipeline(request.natural_language_query, request.session_id)
+    return result
+
+
+@router.get("/stream")
+async def query_stream(session_id: str, query: str):
+    def event_generator():
+        for event_dict in run_pipeline_stream(query, session_id):
+            yield f"data: {json.dumps(event_dict)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.delete("/memory")
+async def delete_memory(session_id: str):
+    clear_memory(session_id)
+    return {"status": "ok"}

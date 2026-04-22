@@ -24,3 +24,23 @@ RUN WITH:
 
 Imports: services/database_service
 """
+
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.database_service import test_connection
+
+print("Testing SQL Server connection...")
+result = test_connection()
+if result["status"] == "success":
+    print("✅ Connected!")
+    print("   Version:", result["version"][:80])
+    sys.exit(0)
+else:
+    print("❌ Failed:", result["message"])
+    print()
+    print("Check:")
+    print("  - DB_SERVER in .env  (e.g. localhost\\SQLEXPRESS)")
+    print("  - ODBC Driver 17 for SQL Server is installed")
+    print("  - SQL Server service is running")
+    print("  - DB_NAME exists in your instance")
+    sys.exit(1)

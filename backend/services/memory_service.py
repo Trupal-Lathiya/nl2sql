@@ -39,3 +39,34 @@ FUNCTIONS EXPORTED:
 Used by: query_pipeline.py (inject into SQL generation prompt)
 Called by: query_routes.py (DELETE endpoint to clear memory)
 """
+
+
+
+_memory: dict = {}
+MAX_MEMORY = 5
+
+
+def get_memory(session_id: str) -> list:
+    return _memory.get(session_id, [])
+
+
+def add_to_memory(session_id: str, nl_query: str, sql: str) -> None:
+    if session_id not in _memory:
+        _memory[session_id] = []
+    _memory[session_id].append({"nl_query": nl_query, "sql": sql})
+    if len(_memory[session_id]) > MAX_MEMORY:
+        _memory[session_id].pop(0)
+
+
+def clear_memory(session_id: str) -> None:
+    _memory.pop(session_id, None)
+
+
+def format_memory_for_prompt(session_id: str) -> str:
+    entries = get_memory(session_id)
+    if not entries:
+        return "No previous queries in this session."
+    lines = ["Previous queries for context:"]
+    for i, e in enumerate(entries, 1):
+        lines.append(f"Q{i}: {e['nl_query']} → {e['sql']}")
+    return "\n".join(lines)
