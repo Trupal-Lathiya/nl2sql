@@ -1,0 +1,34 @@
+// tsconfig.json — TypeScript Compiler Options
+// ============================================
+//
+// Controls how TypeScript type-checks the source files.
+// Vite handles the actual compilation (transpilation) — TypeScript here
+// is used ONLY for type checking (noEmit: true).
+//
+// KEY OPTIONS EXPLAINED:
+//
+//   "target": "ES2020"
+//     Defines what JavaScript features TypeScript assumes are available.
+//     ES2020 supports async/await, optional chaining, nullish coalescing natively.
+//
+//   "module": "ESNext"
+//     Use ES module syntax (import/export). Required by Vite's module system.
+//
+//   "jsx": "react-jsx"
+//     Use the new React 17+ JSX transform. You do NOT need to import React
+//     in every file — the transform handles it automatically.
+//
+//   "strict": true
+//     Enables all strict type-checking flags. Catches more bugs at compile time.
+//     Includes: strictNullChecks, noImplicitAny, strictFunctionTypes, etc.
+//
+//   "moduleResolution": "bundler"
+//     Vite-compatible module resolution strategy. Resolves bare imports
+//     the same way Vite does at build time.
+//
+//   "noEmit": true
+//     TypeScript only type-checks, never writes output files.
+//     Vite handles compilation via its own pipeline (esbuild).
+//
+//   "include": ["src"]
+//     Only type-check files inside src/. Config files and node_modules are excluded.
